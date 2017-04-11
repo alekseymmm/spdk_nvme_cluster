@@ -1,21 +1,26 @@
 
 from subprocess import call
 
-from setuptools import command
-
-
 class Node:
     def __init__(self, name, ip_addr, ib_addr):
         self.name = name
         self.ip_addr = ip_addr
         self.ib_addr = ib_addr
 
-def format_nvme(node_ip_addr, dev):
-    #reset to default firstly
-    command = ["yes | sshpass", "ssh root@" +
-               node_ip_addr +" + hdm reset-to-defaults --path " + dev]
-    print(command)
-    call(command)
+def reset_nvme(node_ip_addr, dev):
+    #reset nvme to default
+    cmd = "\n\nsshpass ssh root@" + \
+        node_ip_addr +" 'yes | hdm reset-to-defaults --path " + dev + "'"
+
+    print(cmd)
+    call(cmd, shell=True)
+
+def reset_all_nodes_nvme(nodes):
+    for name, node in nodes.items():
+        print("Reseting all NVME on node: " + name + " ...")
+        reset_nvme(node.ip_addr, "/dev/nvme0")
+        reset_nvme(node.ip_addr, "/dev/nvme1")
+        print("Reset done")
 
 def load_conf(filename):
     nodes = {}
@@ -33,6 +38,8 @@ def load_conf(filename):
 
 def main():
     nodes = load_conf("nodes.conf")
+    #reset_nvme(nodes["raidix12"].ip_addr, "/dev/nvme0")
+    reset_all_nodes_nvme(nodes)
     
     return
 
