@@ -1,0 +1,49 @@
+[Global]
+ReactorMask 0x00FF
+
+# syslog facility
+LogFacility "local7"
+
+[Rpc]
+Enable No
+Listen 127.0.0.1
+
+# Define NVMf protocol global options
+[Nvmf]
+# Set the maximum number of submission and completion queues per session.
+# Setting this to '8', for example, allows for 8 submission and 8 completion queues
+# per session.
+MaxQueuesPerSession 4
+
+# Set the maximum number of outstanding I/O per queue.
+#MaxQueueDepth 128
+
+# Set the maximum in-capsule data size. Must be a multiple of 16.
+#InCapsuleDataSize 4096
+
+# Set the maximum I/O size. Must be a multiple of 4096.
+#MaxIOSize 131072
+
+# Set the global acceptor lcore ID, lcores are numbered starting at 0.
+#AcceptorCore 0
+
+# Set how often the acceptor polls for incoming connections. The acceptor is also
+# responsible for polling existing connections that have gone idle. 0 means continuously
+# poll. Units in microseconds.
+AcceptorPollRate 10000
+
+# Direct controller
+[Subsystem1]
+NQN1...
+Mode Direct
+Core 0
+Listen1...
+NVMe 0000:81:00.0
+
+[Subsystem2]
+NQN2...
+Mode Direct
+Core 1
+Listen2...
+NVMe 0000:82:00.0
+

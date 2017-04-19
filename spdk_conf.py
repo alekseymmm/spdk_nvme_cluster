@@ -10,7 +10,7 @@ def create_nvmf_config(node):
                 if(line == "NQN2...\n"):
                     line = "NQN nqn.2016-06.io.spdk." + node.name + "_2\n"
                 if (line == "Listen2...\n"):
-                    line = "Listen RDMA " + node.ib_addr2 + ":4420\n"
+                    line = "Listen RDMA " + node.ib_addr2 + ":4421\n"
                 config.write(line)
 
     config.close();
