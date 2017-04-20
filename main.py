@@ -273,18 +273,29 @@ def create_all_nodes_zfs(nodes):
         ns_shift += 1
         print("Creating ZFS done")
 
+def destroy_all_nodes_zfs(nodes):
+    for name, node in nodes.items():
+        print("Destroy zpool on node: " + name + " ...")
+        cmd = "sshpass ssh root@" + node.ip_addr + \
+              " \' zpool destroy tank \'"
+
+        print(cmd)
+        call(cmd, shell=True)
+        print("Destroy zpool done")
+
 def main():
     nodes = load_conf("nodes.conf")
-    #disconnect_all_nodes_tgts(nodes)
-    #reset_spdk(nodes)
+    disconnect_all_nodes_tgts(nodes)
+    reset_spdk(nodes)
     #reset_all_nodes_nvme(nodes)
     #delete_all_nodes_namespaces(nodes)
     #create_all_nodes_namespaces(nodes)
 
     #create_all_nodes_tgts(nodes)
-    #connect_all_nodes_tgts(nodes)
+    connect_all_nodes_tgts(nodes)
 
     create_all_nodes_zfs(nodes)
+    #destroy_all_nodes_zfs(nodes)
 
     #disconnect_all_nodes_tgts(nodes)
 
