@@ -3,6 +3,8 @@ from subprocess import call, Popen, PIPE
 from spdk_conf import create_nvmf_config
 import time
 
+import natsort
+
 NVME_SIZE = 1500 # GB
 
 class Node:
@@ -12,7 +14,29 @@ class Node:
         self.ib_addr1 = ib_addr1
         self.ib_addr2 = ib_addr2
 
+def run_cmd(cmd_string, retry_on_failure_cnt):
+    p = Popen(cmd_string, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+    out, err = p.communicate()
+    print(out)
+    print(err)
+    i = 1
+
+    if(err != "" and retry_on_failure_cnt > 0):
+        print("Try again cmd (" + cmd_string + ") retry_cnt: " + str(retry_on_failure_cnt))
+        retry_on_failure_cnt -= 1
+        time.sleep(2)
+        i += 1
+        run_cmd(cmd_string, retry_on_failure_cnt)
+    #if
+    #print("Cmd execution done")
+
 def reset_nvme(node_ip_addr, dev):
+    cmd = "sshpass ssh root@" + \
+          node_ip_addr + " 'hdm scan'"
+
+    print(cmd)
+    call(cmd, shell=True)
+
     #reset nvme to default
     cmd = "sshpass ssh root@" + \
         node_ip_addr +" 'yes | hdm reset-to-defaults --path " + dev + "'"
@@ -21,6 +45,7 @@ def reset_nvme(node_ip_addr, dev):
     call(cmd, shell=True)
 
 def reset_all_nodes_nvme(nodes):
+    #add hdms scan before rest to defaults
     for name, node in nodes.items():
         print("Reseting all NVME on node: " + name + " ...")
         reset_nvme(node.ip_addr, "/dev/nvme0")
@@ -30,6 +55,12 @@ def reset_all_nodes_nvme(nodes):
 
 def delete_namespaces(node_ip_addr, dev):
     #after reset there is only one namespace
+    cmd = "sshpass ssh root@" + \
+          node_ip_addr + " 'hdm scan'"
+
+    print(cmd)
+    call(cmd, shell=True)
+
     cmd = "sshpass ssh root@" + \
         node_ip_addr +" 'yes | hdm manage-namespaces --delete --id 1 --path " +\
         dev + "'"
@@ -60,6 +91,11 @@ def load_conf(filename):
 def create_namespaces(node_ip_addr, ns_size, ns_count):
     count1 = (ns_count + 1) / 2 #number of ns on the first nvme
     count2 = ns_count - count1
+    cmd = "sshpass ssh root@" + \
+          node_ip_addr + " 'hdm scan'"
+
+    print(cmd)
+    call(cmd, shell=True)
 
     for i in range(1, count1 + 1):
         cmd = "sshpass ssh root@" + \
@@ -84,7 +120,7 @@ def create_all_nodes_namespaces(nodes):
 
     for name, node in nodes.items():
         print("Create NVME namespaces on node: " + name + " ...")
-        create_namespaces(node.ip_addr,ns_size, num_nodes)
+        create_namespaces(node.ip_addr, ns_size, num_nodes)
         print("Create namespaces done")
 
 def create_nvmf_target(node):
@@ -168,22 +204,26 @@ def create_all_nodes_tgts(nodes):
 
 def connect_nvmf_targets(cur_node, nodes):
     for name, node in sorted(nodes.items()):
+        #
+        # cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+        #       " \' ping " + node.ib_addr1 + " -c 4\'"
+        cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+              " \'nohup ping " + node.ib_addr1 + "  > /dev/null 2> /dev/null &\'"
+        print(cmd)
+        call(cmd, shell=True)
 
         cmd = "sshpass ssh root@" + cur_node.ip_addr + \
               " \' nvme discover -t rdma -a " + \
-            node.ib_addr2 +" -s 4420\'"
+            node.ib_addr1 +" -s 4420\'"
 
         print(cmd)
-        call(cmd, shell=True)
-        time.sleep(1)
+        #call(cmd, shell=True)
+        # p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+        # out, err = p.communicate()
+        # print(out)
+        # print(err)
+        run_cmd(cmd, 5)
 
-        cmd = "sshpass ssh root@" + cur_node.ip_addr + \
-              " \' nvme discover -t rdma -a " + \
-            node.ib_addr1 +" -s 4421 \'"
-
-        print(cmd)
-        call(cmd, shell=True)
-        time.sleep(1)
 
         cmd = "sshpass ssh root@" + cur_node.ip_addr + \
              " \' nvme connect -t rdma -n nqn.2016-06.io.spdk." + \
@@ -192,6 +232,28 @@ def connect_nvmf_targets(cur_node, nodes):
         print(cmd)
         call(cmd, shell=True)
 
+        time.sleep(1)
+
+        # cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+        #       " \' ping " + node.ib_addr2 + " -c 4\'"
+        cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+        " \'nohup ping " + node.ib_addr2 + "  > /dev/null 2> /dev/null &\'"
+
+        print(cmd)
+        call(cmd, shell=True)
+
+        cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+              " \' nvme discover -t rdma -a " + \
+            node.ib_addr2 +" -s 4421 \'"
+
+        print(cmd)
+        #call(cmd, shell=True)
+        # p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+        # out, err = p.communicate()
+        # print(out)
+        # print(err)
+        run_cmd(cmd, 5)
+
         cmd = "sshpass ssh root@" + cur_node.ip_addr + \
              " \' nvme connect -t rdma -n nqn.2016-06.io.spdk." + \
              node.name +"_2 -a " + node.ib_addr2 + " -s 4421 \'"
@@ -199,8 +261,14 @@ def connect_nvmf_targets(cur_node, nodes):
         print(cmd)
         call(cmd, shell=True)
 
+        cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+              " \'killall -w ping \'"
+
+        print(cmd)
+        call(cmd, shell=True)
+
 def connect_all_nodes_tgts(nodes):
-    for name, node in nodes.items():
+    for name, node in sorted(nodes.items()):
         print("Connecting NVMF target on node: " + name + " ...")
         connect_nvmf_targets(node, nodes)
         print("Connecting NVMF target done")
@@ -241,7 +309,8 @@ def create_zfs_vol(node, nodes, ns_shift):
               " 'lsblk | grep nvme | cut --delimiter=\" \" -f 1'"
     p = Popen(cmd , stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
     out, err = p.communicate()
-    all_nvme = sorted(out.split("\n"))
+    #all_nvme = sorted(out.split("\n"))
+    all_nvme = natsort.natsorted(out.split("\n"))
     all_nvme.remove("")
 
     for i in range(0, len(all_nvme), num_nodes):
@@ -285,14 +354,13 @@ def destroy_all_nodes_zfs(nodes):
 
 def main():
     nodes = load_conf("nodes.conf")
-    disconnect_all_nodes_tgts(nodes)
-    reset_spdk(nodes)
+    #disconnect_all_nodes_tgts(nodes)
     #reset_all_nodes_nvme(nodes)
     #delete_all_nodes_namespaces(nodes)
     #create_all_nodes_namespaces(nodes)
 
     #create_all_nodes_tgts(nodes)
-    connect_all_nodes_tgts(nodes)
+    #connect_all_nodes_tgts(nodes)
 
     create_all_nodes_zfs(nodes)
     #destroy_all_nodes_zfs(nodes)

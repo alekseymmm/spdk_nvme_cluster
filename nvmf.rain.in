@@ -34,16 +34,16 @@ AcceptorPollRate 0
 
 # Direct controller
 [Subsystem1]
-NQN1...
+NQN nqn.2016-06.io.spdk.raidix1_1
 Mode Direct
 Core 0
-Listen1...
+Listen RDMA 10.30.0.1:4420
 NVMe 0000:81:00.0
 
 [Subsystem2]
-NQN2...
+NQN nqn.2016-06.io.spdk.raidix1_2
 Mode Direct
 Core 1
-Listen2...
+Listen RDMA 10.20.0.1:4421
 NVMe 0000:82:00.0
 
