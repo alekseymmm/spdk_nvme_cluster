@@ -120,7 +120,7 @@ def create_namespaces(node_ip_addr, ns_size, ns_count):
 def create_all_nodes_namespaces(nodes):
     num_nodes = len(nodes)
 
-    ns_size = NVME_SIZE / ((num_nodes + 1) / 2)
+    ns_size = NVME_SIZE // ((num_nodes + 1) // 2)
 
     for name, node in natsort.natsorted(nodes.items()):
         print("Create NVME namespaces on node: " + name + " ...")
@@ -301,10 +301,10 @@ def disconnect_all_nodes_tgts(nodes):
         disconnect_nvmf_targets(node, nodes)
         print("disconnecting NVMF target done")
 
-def create_zfs_vol(node, nodes, ns_shift):
+def create_zfs_vol(node, nodes, ns_shift, vol_size_gb):
     num_nodes = len(nodes)
 
-    ns_size = NVME_SIZE / ((num_nodes + 1) / 2)
+    ns_size = NVME_SIZE // ((num_nodes + 1) // 2)
 
     dev_list = ""
     num_nodes = len(nodes)
@@ -330,47 +330,140 @@ def create_zfs_vol(node, nodes, ns_shift):
     call(cmd, shell=True)
 
     cmd = "sshpass ssh root@" + node.ip_addr + \
-          " \' zpool create -o ashift=12 tank " + dev_list + " \'"
+          " \' zpool create -o ashift=12 -f tank" + str(ns_shift) + " " + dev_list + " \'"
 
     print(cmd)
     call(cmd, shell=True)
 
     cmd = "sshpass ssh root@" + node.ip_addr + \
-          " \' zfs create -b 4KB -V " + str(ns_size) + "gb tank/myvol \'"
+          " \' zfs create -b 4KB -V " + str(vol_size_gb) + "gb tank" +\
+            str(ns_shift) + "/myvol \'"
 
     print(cmd)
     call(cmd, shell=True)
 
-def create_all_nodes_zfs(nodes):
+def create_all_nodes_zfs(nodes, vol_size_gb):
     ns_shift = 0
     for name, node in natsort.natsorted(nodes.items()):
         print("Createing ZFS on node: " + name + " ...")
-        create_zfs_vol(node, nodes, ns_shift)
+        create_zfs_vol(node, nodes, ns_shift, vol_size_gb)
         ns_shift += 1
         print("Creating ZFS done")
 
+def create_md_raid(node, nodes, ns_shift, vol_size_gb):
+    num_nodes = len(nodes)
+
+    ns_size = NVME_SIZE // ((num_nodes + 1) // 2)
+
+    dev_list = ""
+    num_nodes = len(nodes)
+
+    cmd = "sshpass ssh root@" + node.ip_addr +\
+              " 'lsblk | grep nvme | cut --delimiter=\" \" -f 1'"
+    p = Popen(cmd , stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+    out, err = p.communicate()
+    out_str = out.decode("utf-8")
+    err_str = err.decode("utf-8")
+
+    all_nvme = out_str.split("\n")
+    all_nvme = natsort.natsorted(all_nvme)
+    all_nvme.remove("")
+
+    for i in range(0, len(all_nvme), num_nodes):
+        dev_list += "/dev/" + all_nvme[i + ns_shift] + " "
+
+
+    cmd = "sshpass ssh root@" + node.ip_addr + \
+        " \'mdadm --create --verbose /dev/md" + str(ns_shift) + \
+        " --chunk=4096 --level=stripe --raid-devices=" + \
+        str(num_nodes) + " " + dev_list + " \'"
+
+    print(cmd)
+    call(cmd, shell=True)
+
+
+def create_all_nodes_mdraid(nodes, vol_size_gb):
+    ns_shift = 0
+    for name, node in natsort.natsorted(nodes.items()):
+        print("Createing mdraid on node: " + name + " ...")
+        create_md_raid(node, nodes, ns_shift, vol_size_gb)
+        ns_shift += 1
+        print("Creating mdraid done")
+
 def destroy_all_nodes_zfs(nodes):
+    i = 0
     for name, node in natsort.natsorted(nodes.items()):
         print("Destroy zpool on node: " + name + " ...")
         cmd = "sshpass ssh root@" + node.ip_addr + \
-              " \' zpool destroy tank \'"
+              " \' zpool destroy tank" + str(i) + "\'"
+        i += 1
 
         print(cmd)
         call(cmd, shell=True)
         print("Destroy zpool done")
 
+def destroy_mdraid(node, nodes, ns_shift):
+    num_nodes = len(nodes)
+
+    ns_size = NVME_SIZE // ((num_nodes + 1) // 2)
+
+    dev_list = ""
+    num_nodes = len(nodes)
+
+    cmd = "sshpass ssh root@" + node.ip_addr +\
+              " 'lsblk | grep nvme | cut --delimiter=\" \" -f 1'"
+    p = Popen(cmd , stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+    out, err = p.communicate()
+    out_str = out.decode("utf-8")
+    err_str = err.decode("utf-8")
+
+    all_nvme = out_str.split("\n")
+    all_nvme = natsort.natsorted(all_nvme)
+    all_nvme.remove("")
+
+    for i in range(0, len(all_nvme), num_nodes):
+        dev_list += "/dev/" + all_nvme[i + ns_shift] + " "
+
+    cmd = "sshpass ssh root@" + node.ip_addr + \
+        " \'mdadm --stop /dev/md" + str(ns_shift) + " \'"
+    print(cmd)
+    call(cmd, shell=True)
+
+    cmd = "sshpass ssh root@" + node.ip_addr + \
+        " \'mdadm --remove /dev/md" + str(ns_shift) + " \'"
+    print(cmd)
+    call(cmd, shell=True)
+
+    cmd = "sshpass ssh root@" + node.ip_addr + \
+        " \'mdadm --zero-superblock " + dev_list + " \'"
+
+    print(cmd)
+    call(cmd, shell=True)
+
+def destroy_all_nodes_mdraid(nodes):
+    i = 0
+    for name, node in natsort.natsorted(nodes.items()):
+        print("Destroy mdraid on node: " + name + " ...")
+        destroy_mdraid(node, nodes, i)
+        i += 1
+        print("Destroy mdraid done")
+
+
 def main():
     nodes = load_conf("nodes.conf")
-    disconnect_all_nodes_tgts(nodes)
+    #disconnect_all_nodes_tgts(nodes)
     #reset_all_nodes_nvme(nodes)
     #delete_all_nodes_namespaces(nodes)
     #create_all_nodes_namespaces(nodes)
 
     #create_all_nodes_tgts(nodes)
-    #connect_all_nodes_tgts(nodes)
+    connect_all_nodes_tgts(nodes)
 
-    #create_all_nodes_zfs(nodes)
-    destroy_all_nodes_zfs(nodes)
+    create_all_nodes_zfs(nodes, 1024)
+
+    #create_all_nodes_mdraid(nodes, 1024)
+    #destroy_all_nodes_mdraid(nodes)
+    #destroy_all_nodes_zfs(nodes)
 
     #disconnect_all_nodes_tgts(nodes)
 
@@ -380,4 +473,4 @@ if __name__ == "__main__":
     #run main script
     main()
 
-    print("don.")
+    print("done.")

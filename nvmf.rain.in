@@ -13,7 +13,7 @@ Listen 127.0.0.1
 # Set the maximum number of submission and completion queues per session.
 # Setting this to '8', for example, allows for 8 submission and 8 completion queues
 # per session.
-MaxQueuesPerSession 2
+MaxQueuesPerSession 8
 
 # Set the maximum number of outstanding I/O per queue.
 MaxQueueDepth 128
@@ -34,16 +34,16 @@ AcceptorPollRate 0
 
 # Direct controller
 [Subsystem1]
-NQN nqn.2016-06.io.spdk.raidix1_1
+NQN nqn.2016-06.io.spdk.raidix15_1
 Mode Direct
 Core 0
-Listen RDMA 10.30.0.1:4420
+Listen RDMA 10.30.0.15:4420
 NVMe 0000:81:00.0
 
 [Subsystem2]
-NQN nqn.2016-06.io.spdk.raidix1_2
+NQN nqn.2016-06.io.spdk.raidix15_2
 Mode Direct
 Core 1
-Listen RDMA 10.20.0.1:4421
+Listen RDMA 10.20.0.15:4421
 NVMe 0000:82:00.0
 
