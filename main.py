@@ -93,7 +93,7 @@ def load_conf(filename):
     return nodes
 
 def create_namespaces(node_ip_addr, ns_size, ns_count):
-    count1 = (ns_count + 1) / 2 #number of ns on the first nvme
+    count1 = (ns_count + 1) //  2 #number of ns on the first nvme
     count2 = ns_count - count1
     cmd = "sshpass ssh root@" + \
           node_ip_addr + " 'hdm scan'"
@@ -231,7 +231,14 @@ def connect_nvmf_targets(cur_node, nodes):
 
         cmd = "sshpass ssh root@" + cur_node.ip_addr + \
              " \' nvme connect -t rdma -n nqn.2016-06.io.spdk." + \
-             node.name +"_1 -a " + node.ib_addr1 + " -s 4420 \'"
+             node.name +"_1 -a " + node.ib_addr1 + " -s 4420 -q nqn.2016-06.io.spdk." +\
+              cur_node.name + "_1 \'"
+
+        # TODO: try this on linux kernel 4.11.
+        # cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+        #      " \' nvme connect -t rdma -n nqn.2016-06.io.spdk." + \
+        #      node.name +"_1 -a " + node.ib_addr2 + " -s 4421 -w " + \
+        #     cur_node.ib_addr1 + " \'"
 
         print(cmd)
         call(cmd, shell=True)
@@ -251,16 +258,18 @@ def connect_nvmf_targets(cur_node, nodes):
             node.ib_addr2 +" -s 4421 \'"
 
         print(cmd)
-        #call(cmd, shell=True)
-        # p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
-        # out, err = p.communicate()
-        # print(out)
-        # print(err)
         run_cmd(cmd, 5)
 
         cmd = "sshpass ssh root@" + cur_node.ip_addr + \
              " \' nvme connect -t rdma -n nqn.2016-06.io.spdk." + \
-             node.name +"_2 -a " + node.ib_addr2 + " -s 4421 \'"
+             node.name +"_2 -a " + node.ib_addr2 + " -s 4421 -q nqn.2016-06.io.spdk." +\
+              cur_node.name + "_2 \'"
+
+        # TODO: try this on linux kernel 4.11.
+        # cmd = "sshpass ssh root@" + cur_node.ip_addr + \
+        #      " \' nvme connect -t rdma -n nqn.2016-06.io.spdk." + \
+        #      node.name +"_2 -a " + node.ib_addr2 + " -s 4421 -w " + \
+        #     cur_node.ib_addr2 + " \'"
 
         print(cmd)
         call(cmd, shell=True)
@@ -377,7 +386,10 @@ def create_md_raid(node, nodes, ns_shift, vol_size_gb):
         " \'mdadm --create --verbose /dev/md" + str(ns_shift) + \
         " --chunk=4096 --level=stripe --raid-devices=" + \
         str(num_nodes) + " " + dev_list + " \'"
-
+    # cmd = "sshpass ssh root@" + node.ip_addr + \
+    #     " \'mdadm --create --verbose /dev/md" + str(ns_shift) + \
+    #     " --chunk=4096 --level=raid6 --raid-devices=" + \
+    #     str(num_nodes) + " " + dev_list + " \'"
     print(cmd)
     call(cmd, shell=True)
 
@@ -457,11 +469,11 @@ def main():
     #create_all_nodes_namespaces(nodes)
 
     #create_all_nodes_tgts(nodes)
-    connect_all_nodes_tgts(nodes)
+    #connect_all_nodes_tgts(nodes)
 
-    create_all_nodes_zfs(nodes, 1024)
+    #create_all_nodes_zfs(nodes, 1024)c
 
-    #create_all_nodes_mdraid(nodes, 1024)
+    create_all_nodes_mdraid(nodes, 1024)
     #destroy_all_nodes_mdraid(nodes)
     #destroy_all_nodes_zfs(nodes)
 
