@@ -13,6 +13,6 @@ How to use
 4. Do steps 1-3 for all nodes in your cluster.
 5. Provide ssh access without password from managing node (It is not required to be one of your cluster node) because scripts use sshpass to deploy
 6. Write info about your nodes (ip and ib addreses) in the config
-7. Chose whether you wih to deploy it as md raid volumes or as zfs volumes. MD faster but zfs provides a lot of functionality, like dedup, compression, snapshots, thin provisioning and so on.
+7. Chose whether you wish to deploy it as md raid volumes or as zfs volumes. MD faster but zfs provides a lot of functionality, like dedup, compression, snapshots, thin provisioning and so on.
 8. Run main script
 
